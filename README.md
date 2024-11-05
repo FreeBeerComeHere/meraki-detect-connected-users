@@ -12,6 +12,8 @@ This project is an AWS SAM based application. For now, it provides a website thr
 - Update the DynamoDB table with the user's status
 
 ## Steps
-1. Deploy the `ACM certificate.yaml` template through Cloudformation so you can use it with Cloudfront
+1. Deploy the `ACM certificate.yaml` template through Cloudformation so you can use it with Cloudfront:
+
 ```aws cloudformation create-stack --stack-name <name> --template-body file://<location>.yaml --parameters ParameterKey=CertificateFqdn,ParameterValue=<certificate CN> --region us-east-1```
+
 2. TBC
