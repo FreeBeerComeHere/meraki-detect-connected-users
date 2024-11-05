@@ -27,7 +27,7 @@ Parameters:
     Description: Fully qualified domain name of the project (e.g. home.example.com)
   PersonsOfInterest:
     Type: String
-    Description: List of persons we want to show in the UI, will be used as environment variable
+    Description: List of persons we want to show in the UI, will be used as Lambda environment variable
 
 Resources:
   HttpApiGateway:
@@ -36,10 +36,46 @@ Resources:
       Name: !Ref ProjectName
       Description: !Sub '${ProjectDescription} HTTP API gateway'
 
-  LambdaFunction:
+  LambdaFunctionMerakiApi:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Ref ProjectDescription
+      FunctionName: !Sub '${ProjectDescription}-meraki-api-connect'
+      CodeUri: meraki-api-connector/
+      Handler: meraki-api.handler
+      Runtime: python3.12
+      Timeout: 30
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DynamoDBTableName
+          PERSONS_OF_INTEREST: !Ref PersonsOfInterest
+      Policies:
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:*
+              Resource: !Ref DynamoDBTableArn
+      EventInvokeConfig:
+        DestinationConfig:
+          OnFailure:
+            Type: SNS
+            Destination: !Ref SnsTopicForErrorReporting
+      Events:
+        ScheduledEvent:
+          Type: Schedule
+          Properties:
+            Schedule: "rate(1 minute)"
+            Name: !Sub '${ProjectDescription}-eventbridge-trigger'
+            Description: "Triggers every minute"
+            Enabled: true
+
+  LambdaFunctionWebsite:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${ProjectDescription}-website'
       CodeUri: website/
       Handler: app.handler
       Runtime: python3.12
