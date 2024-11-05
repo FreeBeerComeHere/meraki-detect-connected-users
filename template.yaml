@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >
+  AWS SAM template that defines a Lambda function with a DynamoDB backend,
+  exposed through API Gateway and accessible via a custom domain on CloudFront.
+
+Globals:
+  Function:
+    Timeout: 3
+    MemorySize: 128
+
+Parameters:
+  ProjectName:
+    Type: String
+  ProjectDescription:
+    Type: String
+  DynamoDBTableName:
+    Type: String
+  DynamoDBTableArn:
+    Type: String
+  AcmCertificateArn:
+    Type: String
+  SnsTopicForErrorReporting:
+    Type: String
+  ProjectFqdn:
+    Type: String
+    Description: Fully qualified domain name of the project (e.g. home.example.com)
+  PersonsOfInterest:
+    Type: String
+    Description: List of persons we want to show in the UI, will be used as environment variable
+
+Resources:
+  HttpApiGateway:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Name: !Ref ProjectName
+      Description: !Sub '${ProjectDescription} HTTP API gateway'
+
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref ProjectDescription
+      CodeUri: website/
+      Handler: app.handler
+      Runtime: python3.12
+      Timeout: 30
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref DynamoDBTableName
+          PERSONS_OF_INTEREST: !Ref PersonsOfInterest
+      Policies:
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:*
+              Resource: !Ref DynamoDBTableArn
+      EventInvokeConfig:
+        DestinationConfig:
+          OnFailure:
+            Type: SNS
+            Destination: !Ref SnsTopicForErrorReporting
+      Events:
+        ApiEvent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApiGateway
+
+  CloudfrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        PriceClass: PriceClass_100
+        Comment: !Ref ProjectName
+        Enabled: true
+        Origins:
+          - Id: LambdaOrigin
+            DomainName: !Sub "${HttpApiGateway}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: 
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: LambdaOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+          Compress: true
+        ViewerCertificate:
+          AcmCertificateArn: !Ref AcmCertificateArn
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2018
+        Aliases:
+          - !Ref ProjectFqdn

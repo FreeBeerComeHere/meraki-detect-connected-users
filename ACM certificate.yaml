@@ -1,0 +1,22 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  CFN template to deploy an ACM certificate. Remember to deploy to us-east-1 region to use with Cloudfront!
+
+Parameters:
+  CertificateFqdn:
+    Type: String
+  
+Resources:
+  AcmCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref CertificateFqdn
+      DomainValidationOptions:
+        - DomainName: !Ref CertificateFqdn
+          ValidationDomain: !Ref CertificateFqdn
+      ValidationMethod: DNS
+
+Outputs:
+  CertificateArn:
+    Description: "ARN of the ACM certificate."
+    Value: !Ref AcmCertificate
