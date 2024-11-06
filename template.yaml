@@ -14,10 +14,10 @@ Parameters:
     Type: String
   ProjectDescription:
     Type: String
-  DynamoDBTableName:
-    Type: String
-  DynamoDBTableArn:
-    Type: String
+  # DynamoDBTableName:
+  #   Type: String
+  # DynamoDBTableArn:
+  #   Type: String
   AcmCertificateArn:
     Type: String
   SnsTopicForErrorReporting:
@@ -36,10 +36,20 @@ Resources:
       Name: !Ref ProjectName
       Description: !Sub '${ProjectDescription} HTTP API gateway'
 
+  DynamoDBTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: !Sub '${ProjectDescription}-dynamodb'
+      PrimaryKey:
+        Name: person_name
+        Type: String
+      # ProvisionedThroughput: ProvisionedThroughput
+      # SSESpecification: SSESpecification
+
   LambdaFunctionMerakiApi:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub '${ProjectDescription}-meraki-api-connect'
+      FunctionName: !Sub '${ProjectDescription}-meraki-api-connect-lambda'
       CodeUri: meraki-api-connector/
       Handler: meraki-api.handler
       Runtime: python3.12
@@ -48,7 +58,7 @@ Resources:
         - arm64
       Environment:
         Variables:
-          TABLE_NAME: !Ref DynamoDBTableName
+          TABLE_NAME: !Ref DynamoDBTable
           PERSONS_OF_INTEREST: !Ref PersonsOfInterest
       Policies:
         - AWSLambdaExecute
@@ -57,7 +67,7 @@ Resources:
             - Effect: Allow
               Action:
                 - dynamodb:*
-              Resource: !Ref DynamoDBTableArn
+              Resource: !Ref DynamoDBTable.Arn
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
