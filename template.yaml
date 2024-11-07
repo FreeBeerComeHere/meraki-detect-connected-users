@@ -22,12 +22,23 @@ Parameters:
     Type: String
   SnsTopicForErrorReporting:
     Type: String
+    Description: ARN of the SNS topic for error reporting
   ProjectFqdn:
     Type: String
     Description: Fully qualified domain name of the project (e.g. home.example.com)
   PersonsOfInterest:
     Type: String
     Description: List of persons we want to show in the UI, will be used as Lambda environment variable
+  MerakiNetworkId:
+    Type: String
+    Description: Meraki network ID, will be used as Lambda environment variable
+  MerakiApiKeySecretName:
+    Type: String
+    Description: Name of the AWS Secrets Manager secret that contains the Meraki API key
+  MerakiApiKeySecretRegion:
+    Type: String
+    Description: Region of the AWS Secrets Manager secret that contains the Meraki API key
+
 
 Resources:
   HttpApiGateway:
@@ -58,8 +69,11 @@ Resources:
         - arm64
       Environment:
         Variables:
+          MERAKI_NETWORK_ID: !Ref MerakiNetworkId
           TABLE_NAME: !Ref DynamoDBTable
-          PERSONS_OF_INTEREST: !Ref PersonsOfInterest
+          MERAKI_API_KEY_SECRET_NAME: !Ref MerakiApiKeySecretName
+          MERAKI_API_KEY_SECRET_REGION: !Ref MerakiApiKeySecretRegion
+          SNS_TOPIC_ARN: !Ref SnsTopicForErrorReporting
       Policies:
         - AWSLambdaExecute
         - Version: '2012-10-17'
