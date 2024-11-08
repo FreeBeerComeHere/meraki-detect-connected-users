@@ -69,11 +69,12 @@ Resources:
         - arm64
       Environment:
         Variables:
-          MERAKI_NETWORK_ID: !Ref MerakiNetworkId
           TABLE_NAME: !Ref DynamoDBTable
           MERAKI_API_KEY_SECRET_NAME: !Ref MerakiApiKeySecretName
           MERAKI_API_KEY_SECRET_REGION: !Ref MerakiApiKeySecretRegion
+          MERAKI_NETWORK_ID: !Ref MerakiNetworkId
           SNS_TOPIC_ARN: !Ref SnsTopicForErrorReporting
+          PERSONS_OF_INTEREST: !Ref PersonsOfInterest
       Policies:
         - AWSLambdaExecute
         - Version: '2012-10-17'

@@ -16,7 +16,7 @@ def handler(event, context):
         # print(out)
         # Extract status
         try:
-            status = out.get('Item').get('inorout')
+            status = out.get('Item').get('in_or_out')
             print(status)
         except Exception as e:
             # Person not found in DDB
