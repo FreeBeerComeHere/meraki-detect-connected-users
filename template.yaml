@@ -85,13 +85,17 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
               Resource: !Ref DynamoDBTable.Arn
+            - Sid: SNSPublishMessagePolicy
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref SnsTopicForErrorReporting.Arn
             # - Sid: 
             #   Effect: Allow
             #   Action:
             #     - dynamodb:GetItem
             #     - dynamodb:UpdateItem
             #   Resource: !Ref DynamoDBTable.Arn
-            - SNSPublishMessagePolicy	
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
