@@ -79,10 +79,19 @@ Resources:
         - AWSLambdaExecute
         - Version: '2012-10-17'
           Statement:
-            - Effect: Allow
+            - Sid: DDBAllowGetUpdatePolicy
+              Effect: Allow
               Action:
-                - dynamodb:*
+                - dynamodb:GetItem
+                - dynamodb:UpdateItem
               Resource: !Ref DynamoDBTable.Arn
+            # - Sid: 
+            #   Effect: Allow
+            #   Action:
+            #     - dynamodb:GetItem
+            #     - dynamodb:UpdateItem
+            #   Resource: !Ref DynamoDBTable.Arn
+            - SNSPublishMessagePolicy	
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
@@ -117,7 +126,7 @@ Resources:
           Statement:
             - Effect: Allow
               Action:
-                - dynamodb:*
+                - dynamodb:GetItem
               Resource: !Ref DynamoDBTableArn
       EventInvokeConfig:
         DestinationConfig:
