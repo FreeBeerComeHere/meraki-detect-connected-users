@@ -59,23 +59,28 @@ class Person():
             publish_via_sns(f'{traceback.format_exc()}\n{e}')
         else:
             # No error occurred, parse Meraki's response
-            response_content = meraki_response.json()
-            last_seen = response_content.get('lastSeen')
-            print(f'Lastseen value return by Meraki for "{self.person_name}" is "{last_seen}"')
-            if not type(last_seen) == int:
-                print(f'Lastseen value is not an integer, it is "{last_seen}". Setting lastseen to 0.')
-                last_seen = 0
+            try:
+                response_content = meraki_response.json()
+                last_seen = response_content.get('lastSeen')
+            except Exception as e:
+                print(f'An error occurred connecting to the Meraki API or analysing the Meraki API output.')
+            else:
+                print(f'Lastseen value return by Meraki for "{self.person_name}" is "{last_seen}"')
+                if not type(last_seen) == int:
+                    print(f'Lastseen value is not an integer, it is "{last_seen}". Setting last_seen to 0.')
+                    last_seen = 0
 
-            if last_seen > 2000: # yes, the returned value from the API is usable
-                print(f'Calculating delta for person "{self.person_name}": current time {EPOCH_TIME} - last_seen {last_seen} equals ',end='')
-                self.delta = EPOCH_TIME - last_seen
-                print(f'delta {self.delta}')
-                if self.delta > WAIT_TIME_SECONDS:
-                    # Person is not connected
-                    return 'out'
-                else:
-                    # Person is connected
-                    return 'in'
+                if last_seen > 2000: # yes, the returned value from the API is usable
+                    print(f'Calculating delta for person "{self.person_name}": current time {EPOCH_TIME} - last_seen {last_seen} equals ',end='')
+                    self.delta = EPOCH_TIME - last_seen
+                    print(f'delta {self.delta}')
+                    if self.delta > WAIT_TIME_SECONDS:
+                        # Person is not connected
+                        return 'out'
+                    else:
+                        # Person is connected
+                        return 'in'
+        return None
     def get_person_name(self):
         return self.person_name
 
@@ -121,5 +126,5 @@ def get_secret():
     # Decrypts secret using the associated KMS key.
     secret = eval(get_secret_value_response['SecretString'])
 
-    new_secret = secret.get('Meraki-API-key')
-    return new_secret
+    secret = secret.get('Meraki-API-key')
+    return secret
