@@ -244,3 +244,4 @@ samconfig.toml
 website/src/index.html
 /tests
 .aws-sam
+selected.csv
