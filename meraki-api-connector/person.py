@@ -4,6 +4,7 @@ import boto3
 import os
 import requests
 import traceback
+from botocore.exceptions import ClientError
 
 TABLE_NAME = os.environ['TABLE_NAME']
 MERAKI_API_KEY_SECRET_NAME = os.environ['MERAKI_API_KEY_SECRET_NAME']
