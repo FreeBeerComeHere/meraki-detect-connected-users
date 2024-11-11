@@ -4,9 +4,9 @@ This project is an AWS SAM based application. For now, it provides a website thr
 ![](https://github.com/FreeBeerComeHere/meraki-detect-connected-users/blob/main/sample.png?raw=true)
 
 ## What it does
-- Provide a website that indicates if users are online or offline (i.e. connected to the Meraki network or not)
 - Check the user's connection status using the Meraki API
 - Update the DynamoDB table with the user's status
+- Provide a website that indicates if users are online or offline (i.e. connected to the Meraki network or not)
 
 ## Steps
 1. Deploy the `ACM certificate.yaml` template through Cloudformation so you can use it with Cloudfront:
