@@ -35,7 +35,6 @@ Parameters:
     Type: String
     Description: Region of the AWS Secrets Manager secret that contains the Meraki API key
 
-
 Resources:
   HttpApiGateway:
     Type: AWS::Serverless::HttpApi
@@ -50,8 +49,6 @@ Resources:
       PrimaryKey:
         Name: person_name
         Type: String
-      # ProvisionedThroughput: ProvisionedThroughput
-      # SSESpecification: SSESpecification
 
   LambdaFunctionMerakiApi:
     Type: AWS::Serverless::Function
@@ -80,18 +77,12 @@ Resources:
               Action:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
-              Resource: !Ref DynamoDBTable
+              Resource: !GetAtt DynamoDBTable.Arn
             - Sid: SNSPublishMessagePolicy
               Effect: Allow
               Action:
                 - sns:Publish
               Resource: !Ref SnsTopicForErrorReportingArn
-            # - Sid: 
-            #   Effect: Allow
-            #   Action:
-            #     - dynamodb:GetItem
-            #     - dynamodb:UpdateItem
-            #   Resource: !Ref DynamoDBTable.Arn
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
@@ -124,10 +115,11 @@ Resources:
         - AWSLambdaExecute
         - Version: '2012-10-17'
           Statement:
-            - Effect: Allow
-              Action:
-                - dynamodb:GetItem
-              Resource: !Ref DynamoDBTable 
+          - Sid: DDBAllowGetItemPolicy
+            Effect: Allow
+            Action:
+              - dynamodb:GetItem
+            Resource: !GetAtt DynamoDBTable.Arn
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
