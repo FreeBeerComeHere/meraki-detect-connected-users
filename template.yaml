@@ -89,7 +89,7 @@ Resources:
           SNS_TOPIC_ARN: !Ref SnsTopicForErrorReportingArn
           PERSONS_OF_INTEREST: !Ref PersonsOfInterest
           PERSONS_OF_INTEREST_DEVICE_IDS: !Ref PersonsOfInterestDeviceIds
-          S3_BUCKET: !Ref S3Bucket
+          S3_BUCKET_NAME: !Ref S3Bucket
       Policies:
         - AWSLambdaExecute
         - Version: '2012-10-17'
@@ -111,6 +111,14 @@ Resources:
               Action:
                 - secretsmanager:GetSecretValue
               Resource: !Ref MerakiApiKeySecretArn
+            - Sid: S3Policy
+              Effect: Allow
+              Action:
+                - s3:*
+              Resource:
+              - !GetAtt S3Bucket.Arn
+              - !Sub "${S3Bucket.Arn}/*"
+
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
@@ -124,51 +132,6 @@ Resources:
             Name: !Sub '${ProjectDescription}-eventbridge-trigger'
             Description: "Triggers every minute"
             Enabled: true
-
-  UpdateWebsiteLambdaFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      FunctionName: !Sub '${ProjectDescription}-website'
-      CodeUri: update_website/
-      # Handler: app.update_website_on_s3
-      Handler: app.render_website
-      Runtime: python3.12
-      Timeout: 30
-      Architectures:
-        - arm64
-      Environment:
-        Variables:
-          TABLE_NAME: !Ref DynamoDBTable
-          PERSONS_OF_INTEREST: !Ref PersonsOfInterest
-      Policies:
-        - AWSLambdaExecute
-        - Version: '2012-10-17'
-          Statement:
-          - Sid: DDBAllowGetItemPolicy
-            Effect: Allow
-            Action:
-              - dynamodb:GetItem
-            Resource: !GetAtt DynamoDBTable.Arn
-          - Sid: S3Policy
-            Effect: Allow
-            Action:
-              - s3:*
-            Resource: !GetAtt S3Bucket.Arn
-      EventInvokeConfig:
-        DestinationConfig:
-          OnFailure:
-            Type: SNS
-            Destination: !Ref SnsTopicForErrorReportingArn
-      Events:
-        ApiEvent:
-          Type: HttpApi
-          Properties:
-            ApiId: !Ref HttpApiGateway
-        DDBUpdateEvent:
-          Type: DynamoDB
-          Properties:
-            StartingPosition: TRIM_HORIZON # Process all available records
-            Stream: !GetAtt DynamoDBTable.StreamArn
 
   OriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
@@ -218,21 +181,22 @@ Resources:
         Aliases:
           - !Ref ProjectFqdn
 
-  # WebsiteBucketPolicy:
-  #   Type: AWS::S3::BucketPolicy
-  #   Properties:
-  #     Bucket: !Ref S3Bucket
-  #     PolicyDocument:
-  #       Version: '2012-10-17'
-  #       Statement:
-  #         - Effect: Allow
-  #           Principal: cloudfront.amazonaws.com
-  #           Action:
-  #           - s3:*
-  #           Resource: !Sub "${S3Bucket.Arn}/*"
-  #           Condition:
-  #             StringEquals:
-  #               AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudfrontDistribution}"
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action:
+            - s3:GetObject
+            Resource: !Sub "${S3Bucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudfrontDistribution}"
 
 Outputs:
   CloudFrontDistributionDomainName:
