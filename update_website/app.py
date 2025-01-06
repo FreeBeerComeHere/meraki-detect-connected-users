@@ -5,7 +5,14 @@ from dynamodb import DynamoDB
 PERSONS_OF_INTEREST = os.environ['PERSONS_OF_INTEREST'].split(sep=' ')
 TABLE_NAME = os.environ['TABLE_NAME']
 
-def handler(event, context):
+def update_website_on_s3(event, context):
+    print(f'Dumping the event describing the ')
+    return {
+        'statusCode': 200,
+        'body': 'Hello from Lambda!'
+    }
+    
+def render_website(event, context):
     # print(event)
     with open('src/index.html', 'r') as f:
         html_code = f.read()
