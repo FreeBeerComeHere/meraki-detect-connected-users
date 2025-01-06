@@ -14,6 +14,9 @@ MERAKI_API_BASE_URL = f'https://api.meraki.com/api/v1/networks/{MERAKI_NETWORK_I
 SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
 WAIT_TIME_SECONDS=300 # This is the amount of seconds to wait before changing a persons status. Higher = fewer false positives
 EPOCH_TIME = int(time.time())
+PERSONS_OF_INTEREST = os.environ['PERSONS_OF_INTEREST'].split(sep=' ')
+PERSONS_OF_INTEREST_DEVICE_IDS = os.environ['PERSONS_OF_INTEREST_DEVICE_IDS'].split(sep=' ')
+
 
 class Person():
     def __init__(self,person_name):
@@ -21,11 +24,14 @@ class Person():
         self.ddb = DynamoDB(TABLE_NAME)
         # Search person in DDB
         response = self.ddb.get_item(self.person_name)
+        print(f'Dumping DDB response: {response}')
         if 'Item' not in response:
             # Person does not exist in DDB
-            print(f'Person "{self.person_name}" does not exist in DDB')
+            print(f'Person "{self.person_name}" does not exist in DDB - creating the person')
+            # Get the person's device ID
+            device_id = PERSONS_OF_INTEREST_DEVICE_IDS[PERSONS_OF_INTEREST.index(self.person_name)]
+            response = self.ddb.put_item(self.person_name, device_id)
         else:
-            print(f'Dumping DDB response: {response}')
             self.device_id = response.get('Item').get('device_id')
             self.old_status = response.get('Item').get('in_or_out')
             self.delta = 0
