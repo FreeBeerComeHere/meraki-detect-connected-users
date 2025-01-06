@@ -8,6 +8,8 @@ Globals:
   Function:
     Timeout: 3
     MemorySize: 128
+    Tags:
+      project: !Ref ProjectName
 
 Parameters:
   ProjectName:
@@ -25,6 +27,9 @@ Parameters:
   PersonsOfInterest:
     Type: String
     Description: List of persons we want to show in the UI, will be used as Lambda environment variable
+  PersonsOfInterestDeviceIds:
+    Type: String
+    Description: List of device IDs of PersonsOfInterest
   MerakiNetworkId:
     Type: String
     Description: Meraki network ID, will be used as Lambda environment variable
@@ -37,28 +42,40 @@ Parameters:
   MerakiApiKeySecretRegion:
     Type: String
     Description: Region of the AWS Secrets Manager secret that contains the Meraki API key
-
+  
 Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    # The S3 bucket where the HTML content is stored
+    Properties:
+      BucketName: !Sub '${ProjectDescription}-website-bucket'
+
   HttpApiGateway:
     Type: AWS::Serverless::HttpApi
     Properties:
       Name: !Ref ProjectName
       Description: !Sub '${ProjectDescription} HTTP API gateway'
-
+      
   DynamoDBTable:
-    Type: AWS::Serverless::SimpleTable
+    Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub '${ProjectDescription}-dynamodb'
-      PrimaryKey:
-        Name: person_name
-        Type: String
+      AttributeDefinitions:
+      - AttributeName: person_name
+        AttributeType: S
+      KeySchema:
+        - AttributeName: person_name
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      BillingMode: PAY_PER_REQUEST
 
   LambdaFunctionMerakiApi:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${ProjectDescription}-meraki-api-connect-lambda'
       CodeUri: meraki-api-connector/
-      Handler: meraki-api.handler
+      Handler: main.handler
       Runtime: python3.12
       Timeout: 30
       Architectures:
@@ -71,15 +88,18 @@ Resources:
           MERAKI_NETWORK_ID: !Ref MerakiNetworkId
           SNS_TOPIC_ARN: !Ref SnsTopicForErrorReportingArn
           PERSONS_OF_INTEREST: !Ref PersonsOfInterest
+          PERSONS_OF_INTEREST_DEVICE_IDS: !Ref PersonsOfInterestDeviceIds
+          S3_BUCKET: !Ref S3Bucket
       Policies:
         - AWSLambdaExecute
         - Version: '2012-10-17'
           Statement:
-            - Sid: DDBAllowGetUpdatePolicy
+            - Sid: DDBAllowCRUPolicy
               Effect: Allow
               Action:
                 - dynamodb:GetItem
                 - dynamodb:UpdateItem
+                - dynamodb:PutItem
               Resource: !GetAtt DynamoDBTable.Arn
             - Sid: SNSPublishMessagePolicy
               Effect: Allow
@@ -105,12 +125,13 @@ Resources:
             Description: "Triggers every minute"
             Enabled: true
 
-  LambdaFunctionWebsite:
+  UpdateWebsiteLambdaFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub '${ProjectDescription}-website'
-      CodeUri: website/
-      Handler: app.handler
+      CodeUri: update_website/
+      # Handler: app.update_website_on_s3
+      Handler: app.render_website
       Runtime: python3.12
       Timeout: 30
       Architectures:
@@ -128,6 +149,11 @@ Resources:
             Action:
               - dynamodb:GetItem
             Resource: !GetAtt DynamoDBTable.Arn
+          - Sid: S3Policy
+            Effect: Allow
+            Action:
+              - s3:*
+            Resource: !GetAtt S3Bucket.Arn
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
@@ -138,23 +164,46 @@ Resources:
           Type: HttpApi
           Properties:
             ApiId: !Ref HttpApiGateway
+        DDBUpdateEvent:
+          Type: DynamoDB
+          Properties:
+            StartingPosition: TRIM_HORIZON # Process all available records
+            Stream: !GetAtt DynamoDBTable.StreamArn
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${ProjectDescription} OAC"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   CloudfrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
+        Logging:
+          Bucket: pvr-access-logs.s3.amazonaws.com
+          Prefix: !Ref ProjectFqdn
+        DefaultRootObject: index.html
         PriceClass: PriceClass_100
         Comment: !Ref ProjectName
         Enabled: true
         Origins:
-          - Id: LambdaOrigin
-            DomainName: !Sub "${HttpApiGateway}.execute-api.${AWS::Region}.amazonaws.com"
-            CustomOriginConfig:
-              OriginProtocolPolicy: https-only
-              OriginSSLProtocols: 
-                - TLSv1.2
+          # - Id: LambdaOrigin
+          #   DomainName: !Sub "${HttpApiGateway}.execute-api.${AWS::Region}.amazonaws.com"
+          #   CustomOriginConfig:
+          #     OriginProtocolPolicy: https-only
+          #     OriginSSLProtocols: 
+          #       - TLSv1.2
+          - Id: S3Origin
+            DomainName: !Sub "${S3Bucket}.s3.${AWS::Region}.amazonaws.com"
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
         DefaultCacheBehavior:
-          TargetOriginId: LambdaOrigin
+          TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
           AllowedMethods:
             - GET
@@ -168,3 +217,27 @@ Resources:
           MinimumProtocolVersion: TLSv1.2_2018
         Aliases:
           - !Ref ProjectFqdn
+
+  # WebsiteBucketPolicy:
+  #   Type: AWS::S3::BucketPolicy
+  #   Properties:
+  #     Bucket: !Ref S3Bucket
+  #     PolicyDocument:
+  #       Version: '2012-10-17'
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal: cloudfront.amazonaws.com
+  #           Action:
+  #           - s3:*
+  #           Resource: !Sub "${S3Bucket.Arn}/*"
+  #           Condition:
+  #             StringEquals:
+  #               AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudfrontDistribution}"
+
+Outputs:
+  CloudFrontDistributionDomainName:
+    Description: Domain name of the CloudFront distribution
+    Value: !GetAtt CloudfrontDistribution.DomainName
+  DynamoDBTableStreamArn:
+    Description: ARN of the DynamoDB table stream
+    Value: !GetAtt DynamoDBTable.StreamArn
