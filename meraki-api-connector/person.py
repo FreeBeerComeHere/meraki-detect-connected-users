@@ -22,11 +22,12 @@ class Person():
     def __init__(self,person_name):
         self.person_name = person_name
         self.ddb = DynamoDB(TABLE_NAME)
+        self.state_has_changed = False # This is used to determine if a person's state has changed
         # Search person in DDB
         response = self.ddb.get_item(self.person_name)
         print(f'Dumping DDB response: {response}')
         if 'Item' not in response:
-            # Person does not exist in DDB
+            # Person does not exist in DDB, create it
             print(f'Person "{self.person_name}" does not exist in DDB - creating the person')
             # Get the person's device ID
             device_id = PERSONS_OF_INTEREST_DEVICE_IDS[PERSONS_OF_INTEREST.index(self.person_name)]
@@ -41,6 +42,7 @@ class Person():
                 print(f'PING PING Status change detected for "{self.person_name}": {self.old_status} does not equal {self.new_status}')
                 # print(f'delta is "{delta}"')
                 # Send new status to DDB
+                self.state_has_changed = True
                 self.write_to_db()
             else:
                 print(f'No status change, old status is "{self.old_status}" and new status is "{self.new_status}", delta is "{self.delta}".')
@@ -88,18 +90,7 @@ class Person():
                         # Person is connected
                         return 'in'
         return None
-    def get_person_name(self):
-        return self.person_name
-
-    def get_device_id(self):
-        return self.device_id
-
-    def get_status(self):
-        return self.status
-
-    def set_status(self,status):
-        self.status = status
-
+    
     def write_to_db(self):
         self.print_values_to_write()
         response = self.ddb.update_item(self.person_name,self.new_status)
