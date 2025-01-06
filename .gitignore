@@ -241,8 +241,8 @@ $RECYCLE.BIN/
 
 # Custom #
 samconfig.toml
-website/src/index.html
 /tests
 .aws-sam
 selected.csv
 rework_csv.py
+meraki-api-connector/website_data/src/index.html
