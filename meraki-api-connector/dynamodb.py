@@ -26,6 +26,15 @@ class DynamoDB:
         )
         return response
     
+    def put_item(self, person_name, device_id='000000'):
+        response = self.table.put_item(
+            Item={
+                'person_name': person_name,
+                'device_id': device_id,
+            }
+        )
+        return response
+    
     def scan(self):
         response = self.table.scan()
         return response
