@@ -42,19 +42,23 @@ Parameters:
   MerakiApiKeySecretRegion:
     Type: String
     Description: Region of the AWS Secrets Manager secret that contains the Meraki API key
-  
+
+  PushsaferSecretName:
+    Type: String
+    Description: Name of the AWS Secrets Manager secret that contains the PushSafer API key
+  PushsaferSecretArn:
+    Type: String
+    Description: ARN of the AWS Secrets Manager secret that contains the PushSafer API key
+  PushsaferSecretRegion:
+    Type: String
+    Description: Region of the AWS Secrets Manager secret that contains the PushSafer API key
+
 Resources:
   S3Bucket:
     Type: AWS::S3::Bucket
     # The S3 bucket where the HTML content is stored
     Properties:
       BucketName: !Sub '${ProjectDescription}-website-bucket'
-
-  HttpApiGateway:
-    Type: AWS::Serverless::HttpApi
-    Properties:
-      Name: !Ref ProjectName
-      Description: !Sub '${ProjectDescription} HTTP API gateway'
       
   DynamoDBTable:
     Type: AWS::DynamoDB::Table
@@ -67,13 +71,13 @@ Resources:
         - AttributeName: person_name
           KeyType: HASH
       StreamSpecification:
-        StreamViewType: NEW_IMAGE
+        StreamViewType: NEW_AND_OLD_IMAGES
       BillingMode: PAY_PER_REQUEST
 
   LambdaFunctionMerakiApi:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub '${ProjectDescription}-meraki-api-connect-lambda'
+      FunctionName: !Sub '${ProjectDescription}-meraki-api-connect'
       CodeUri: meraki-api-connector/
       Handler: main.handler
       Runtime: python3.12
@@ -118,7 +122,6 @@ Resources:
               Resource:
               - !GetAtt S3Bucket.Arn
               - !Sub "${S3Bucket.Arn}/*"
-
       EventInvokeConfig:
         DestinationConfig:
           OnFailure:
@@ -131,6 +134,49 @@ Resources:
             Schedule: "rate(1 minute)"
             Name: !Sub '${ProjectDescription}-eventbridge-trigger'
             Description: "Triggers every minute"
+            Enabled: true
+
+  LambdaFunctionInform:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${ProjectDescription}-meraki-inform'
+      CodeUri: pushsafer-informer/
+      Handler: main.handler
+      Runtime: python3.12
+      Timeout: 30
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          PUSHSAFER_SECRET_NAME: !Ref PushsaferSecretName
+          PUSHSAFER_SECRET_REGION: !Ref PushsaferSecretRegion
+          TABLE_NAME: !Ref DynamoDBTable
+          SNS_TOPIC_ARN: !Ref SnsTopicForErrorReportingArn
+      Policies:
+        - AWSLambdaExecute
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: SNSPublishMessagePolicy
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref SnsTopicForErrorReportingArn
+            - Sid: SecretsManagerGetSecretValuePolicy
+              Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Ref PushsaferSecretArn
+      EventInvokeConfig:
+        DestinationConfig:
+          OnFailure:
+            Type: SNS
+            Destination: !Ref SnsTopicForErrorReportingArn
+      Events:
+        DDBEvent:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt DynamoDBTable.StreamArn
+            StartingPosition: LATEST
             Enabled: true
 
   OriginAccessControl:
