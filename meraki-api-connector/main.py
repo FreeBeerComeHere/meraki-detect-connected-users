@@ -2,7 +2,6 @@ import mimetypes
 import boto3
 import os
 from person import Person
-import time
 
 PERSONS_OF_INTEREST = os.environ['PERSONS_OF_INTEREST'].split(sep=' ')
 S3_BUCKET_NAME = os.environ['S3_BUCKET_NAME']
