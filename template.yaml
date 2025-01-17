@@ -54,6 +54,12 @@ Parameters:
     Description: Region of the AWS Secrets Manager secret that contains the PushSafer API key
 
 Resources:
+  # HttpApiGateway:
+  #   Type: AWS::Serverless::HttpApi
+  #   Properties:
+  #     Name: !Ref ProjectName
+  #     Description: !Sub '${ProjectDescription} HTTP API gateway'
+
   S3Bucket:
     Type: AWS::S3::Bucket
     # The S3 bucket where the HTML content is stored
