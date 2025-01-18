@@ -12,14 +12,15 @@ MERAKI_API_KEY_SECRET_REGION = os.environ['MERAKI_API_KEY_SECRET_REGION']
 MERAKI_NETWORK_ID = os.environ['MERAKI_NETWORK_ID']
 MERAKI_API_BASE_URL = f'https://api.meraki.com/api/v1/networks/{MERAKI_NETWORK_ID}/clients/' # Changed from v0 to v1 on 28Jan24 due to Meraki v0 deprecation
 SNS_TOPIC_ARN = os.environ['SNS_TOPIC_ARN']
-WAIT_TIME_SECONDS=300 # This is the amount of seconds to wait before changing a persons status. Higher = fewer false positives
-EPOCH_TIME = int(time.time())
+WAIT_TIME_SECONDS=240 # This is the amount of seconds to wait before changing a persons status. Higher = fewer false positives
 PERSONS_OF_INTEREST = os.environ['PERSONS_OF_INTEREST'].split(sep=' ')
 PERSONS_OF_INTEREST_DEVICE_IDS = os.environ['PERSONS_OF_INTEREST_DEVICE_IDS'].split(sep=' ')
 
 
 class Person():
     def __init__(self,person_name):
+        self.current_time = int(time.time())
+        
         self.person_name = person_name
         self.ddb = DynamoDB(TABLE_NAME)
         self.state_has_changed = False # This is used to determine if a person's state has changed
@@ -80,8 +81,8 @@ class Person():
                     last_seen = 0
 
                 if last_seen > 2000: # yes, the returned value from the API is usable
-                    print(f'Calculating delta for person "{self.person_name}": current time {EPOCH_TIME} - last_seen {last_seen} equals ',end='')
-                    self.delta = EPOCH_TIME - last_seen
+                    print(f'Calculating delta for person "{self.person_name}": current time {self.current_time} - last_seen {last_seen} equals ',end='')
+                    self.delta = self.current_time - last_seen
                     print(f'delta {self.delta}')
                     if self.delta > WAIT_TIME_SECONDS:
                         # Person is not connected
